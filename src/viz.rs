@@ -1,25 +1,38 @@
 //! Visualization
 //! Responsible for rendering the game state and neural network on the terminal
 
-use std::io::{self, stdout, Stdout};
-use std::time::Instant;
-
-use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-};
-use crossterm::ExecutableCommand;
-use ratatui::backend::CrosstermBackend;
-use ratatui::prelude::*;
-use ratatui::widgets::canvas::{Canvas, Painter, Shape};
-use ratatui::widgets::{
-    Block, BorderType, Borders, Gauge, List, ListItem, Padding, Paragraph, Sparkline,
+use std::{
+    io::{self, stdout, Stdout},
+    time::Instant,
 };
 
-use crate::agent::Agent;
-use crate::game::Game;
-use crate::nn::Net;
-use crate::sim::GenerationSummary;
-use crate::*;
+use color_eyre::Result;
+use ratatui::{
+    backend::CrosstermBackend,
+    crossterm::{
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+        ExecutableCommand,
+    },
+    prelude::*,
+    widgets::{
+        canvas::{Canvas, Painter, Shape},
+        Block, BorderType, Borders, Gauge, List, ListItem, Padding, Paragraph, Sparkline,
+    },
+};
+use symbols::Marker;
+
+use crate::{
+    agent::Agent,
+    config::{
+        AGENT_COUNT, BRAIN_MUTATION_RATE, GRID_SIZE, IS_LOW_DETAIL_MODE, LOAD_NET, NN_ARCH,
+        SAVE_BEST_NET, STEP_COUNT, USE_GAME_CANVAS, VIZ_GAME_SCALE, VIZ_GRAPHS_LEN, VIZ_OFFSET,
+        VIZ_UPDATE_FRAMES,
+    },
+    game::Game,
+    neural_net::NeuralNet,
+    simulation::GenerationSummary,
+    utils::{Direction, Point},
+};
 
 const COLOR_WALLS: Color = Color::Indexed(137);
 const COLOR_BODY: Color = Color::Indexed(140);
@@ -30,7 +43,7 @@ const COLOR_FOOD: Color = Color::LightGreen;
 pub struct Viz {
     frame_count: u32,
     data: VizData,
-    term: Terminal<CrosstermBackend<Stdout>>,
+    terminal: Terminal<CrosstermBackend<Stdout>>,
 }
 
 struct TermViz;
@@ -60,18 +73,18 @@ impl Viz {
         Ok(Self {
             frame_count: 0,
             data: VizData::default(),
-            term: TermViz::init_terminal()?,
+            terminal: TermViz::init_terminal()?,
         })
     }
 
-    pub fn update_brain(&mut self, new_brain: Net) {
+    pub fn update_brain(&mut self, new_brain: NeuralNet) {
         self.data.agent = Some(Agent::with_brain(new_brain));
     }
 
     pub fn update_summary(&mut self, stats: GenerationSummary) {
         self.data.stats = stats;
 
-        self.data.scores.push(stats.gen_max_score as u64);
+        self.data.scores.push(stats.generation_max_score as u64);
         self.data
             .gen_times
             .push((stats.time_elapsed_secs * 1000.0) as u64);
@@ -83,27 +96,30 @@ impl Viz {
         }
     }
 
-    pub fn update(&mut self) {
+    pub fn update(&mut self) -> Result<()> {
         if self.data.agent.is_none() {
-            return;
+            return Ok(());
         }
 
         self.frame_count = (self.frame_count + 1) % 1000;
         if self.frame_count % VIZ_UPDATE_FRAMES != 0 {
-            return;
+            return Ok(());
         }
 
         // Update game agent
         // TODO find a better way to do the update
         let agent = self.data.agent.as_mut().unwrap();
-        let is_alive = agent.update();
+        let is_alive = agent.update()?;
         if !is_alive {
             self.data.agent = Some(Agent::with_brain(agent.brain.clone()));
         }
+        Ok(())
     }
 
     pub fn draw(&mut self) {
-        let _ = self.term.draw(|f| TermViz::draw(f, &self.data));
+        let _ = self
+            .terminal
+            .draw(|f| TermViz::draw(f, &self.data).unwrap());
     }
 
     pub fn restore_terminal() -> io::Result<()> {
@@ -121,22 +137,22 @@ impl TermViz {
         Terminal::new(CrosstermBackend::new(stdout()))
     }
 
-    fn draw(f: &mut Frame, viz: &VizData) {
+    fn draw(frame: &mut Frame, viz: &VizData) -> Result<()> {
         // Gen-0, Viz agent not available yet
         if viz.agent.is_none() {
-            f.render_widget(
+            frame.render_widget(
                 TermViz::widget_raw_text("Running Gen 0. Please Wait.".to_string()),
-                f.size(),
+                frame.size(),
             );
-            return;
+            return Ok(());
         }
 
         if IS_LOW_DETAIL_MODE {
-            f.render_widget(
+            frame.render_widget(
                 TermViz::widget_raw_text(TermViz::get_simple_render_text(viz)),
-                f.size(),
+                frame.size(),
             );
-            return;
+            return Ok(());
         }
 
         let agent = viz.agent.as_ref().unwrap();
@@ -158,38 +174,39 @@ impl TermViz {
             Constraint::Percentage(20),
         ]);
 
-        let [game_lane, net_lane, stats_lane] = root.areas(f.size());
+        let [game_lane, net_lane, stats_lane] = root.areas(frame.size());
         let [nn_viz_area, about_area] = net_viz_vertical.areas(net_lane);
         let [game_area, _] = game_viz_vertical.areas(game_lane);
         let [sim_summary, viz_summary, viz_score_gauge, max_score_gauge, gen_times_graph, score_graph] =
             stats_viz_vertical.areas(stats_lane);
 
-        f.render_widget(TermViz::render_about(), about_area);
-        f.render_widget(
+        frame.render_widget(TermViz::render_about(), about_area);
+        frame.render_widget(
             TermViz::render_viz_score_gauge(agent.game.score()),
             viz_score_gauge,
         );
-        f.render_widget(
-            TermViz::render_max_score_gauge(viz.stats.sim_max_score),
+        frame.render_widget(
+            TermViz::render_max_score_gauge(viz.stats.simulation_max_score),
             max_score_gauge,
         );
-        f.render_widget(TermViz::render_score_graph(&viz.scores), score_graph);
-        f.render_widget(
+        frame.render_widget(TermViz::render_score_graph(&viz.scores), score_graph);
+        frame.render_widget(
             TermViz::render_gen_times_graph(&viz.gen_times),
             gen_times_graph,
         );
-        f.render_widget(
+        frame.render_widget(
             TermViz::render_sim_stats(&viz.stats, &viz.sim_start_ts),
             sim_summary,
         );
-        f.render_widget(TermViz::render_viz_stats(agent), viz_summary);
-        f.render_widget(TermViz::render_nn(agent), nn_viz_area);
+        frame.render_widget(TermViz::render_viz_stats(agent), viz_summary);
+        frame.render_widget(TermViz::render_nn(agent)?, nn_viz_area);
 
         if USE_GAME_CANVAS {
-            f.render_widget(TermViz::render_game_canvas(&agent.game), game_area);
+            frame.render_widget(TermViz::render_game_canvas(&agent.game), game_area);
         } else {
-            f.render_widget(TermViz::display_game_blocks(&agent.game), game_area);
+            frame.render_widget(TermViz::display_game_blocks(&agent.game), game_area);
         }
+        Ok(())
     }
 
     fn render_game_canvas(game: &Game) -> impl Widget + '_ {
@@ -227,9 +244,9 @@ impl TermViz {
         let max_score = (GRID_SIZE - 1) * (GRID_SIZE - 1);
         let items = vec![
             "".to_string(),
-            format!("Gen: {0}", stats.gen_count),
-            format!("Sim Max: {0}/{1}", stats.sim_max_score, max_score),
-            format!("Gen Max: {0}/{1}", stats.gen_max_score, max_score),
+            format!("Gen: {0}", stats.generation_count),
+            format!("Sim Max: {0}/{1}", stats.simulation_max_score, max_score),
+            format!("Gen Max: {0}/{1}", stats.generation_max_score, max_score),
             format!("Gen Ts: {:.2} secs", stats.time_elapsed_secs),
             format!("Sim Ts: {:.2} mins", elapsed),
         ];
@@ -240,12 +257,12 @@ impl TermViz {
     fn render_about() -> impl Widget {
         let title = "  S N A K E   A I  ";
         let items = vec![
-            format!("Num Agents: {NUM_AGENTS}"),
-            format!("Step Limit: {NUM_STEPS}"),
+            format!("Num Agents: {AGENT_COUNT}"),
+            format!("Step Limit: {STEP_COUNT}"),
             format!("Mutation Rate: {BRAIN_MUTATION_RATE}"),
             format!("Net Arch: {:?}", NN_ARCH),
-            format!("Save Net: {IS_SAVE_BEST_NET}"),
-            format!("Load Net: {IS_LOAD_SAVED_DATA}"),
+            format!("Save Net: {SAVE_BEST_NET}"),
+            format!("Load Net: {LOAD_NET}"),
             "".to_string(),
             "Press [ESC] to quit".to_string(),
         ];
@@ -319,10 +336,10 @@ impl TermViz {
         let max_score = (GRID_SIZE - 1) * (GRID_SIZE - 1);
         let mut message = format!(
             "Gen: {:?}, Max: {:?}/{:?}, Gen_Max: {:?}/{:?}, Ts: {:.2?}, Sim_Ts: {:.2?}\n\n",
-            viz.stats.gen_count,
-            viz.stats.sim_max_score,
+            viz.stats.generation_count,
+            viz.stats.simulation_max_score,
             max_score,
-            viz.stats.gen_max_score,
+            viz.stats.generation_max_score,
             max_score,
             viz.stats.time_elapsed_secs,
             (viz.sim_start_ts.elapsed().as_secs_f32() / 60.0)
@@ -415,10 +432,10 @@ impl TermViz {
         ]
     }
 
-    fn get_node_colors(agent: &Agent) -> NNColors {
+    fn get_node_colors(agent: &Agent) -> Result<NNColors> {
         let disabled_color = Color::DarkGray;
         let nn_input = agent.get_brain_input();
-        let nn_output = agent.get_brain_output();
+        let nn_output = agent.get_brain_output()?;
 
         // Process the input to get a list of colors for the input layer
         let mut inp_colors = vec![];
@@ -482,40 +499,41 @@ impl TermViz {
         ];
         let result_color = Color::LightMagenta;
         match nn_output {
-            FourDirs::Left => {
+            Direction::Left => {
                 out_colors[0] = result_color;
             }
-            FourDirs::Right => {
+            Direction::Right => {
                 out_colors[1] = result_color;
             }
-            FourDirs::Bottom => {
+            Direction::Bottom => {
                 out_colors[3] = result_color;
             }
-            FourDirs::Top => {
+            Direction::Top => {
                 out_colors[2] = result_color;
             }
         }
 
-        NNColors {
+        Ok(NNColors {
             disabled_color,
             inp_colors,
             hidden_1_colors,
             hidden_2_colors,
             out_colors,
-        }
+        })
     }
 
-    fn render_nn(agent: &Agent) -> impl Widget {
+    fn render_nn(agent: &Agent) -> Result<impl Widget> {
         if NN_ARCH != [24, 16, 8, 4] {
             let block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Plain);
-            return Paragraph::new("Can only visualize network with arch [24, 16, 8, 4]")
-                .block(block);
+            return Ok(
+                Paragraph::new("Can only visualize network with arch [24, 16, 8, 4]").block(block),
+            );
         }
 
         let network: Vec<Vec<&str>> = TermViz::get_network_text();
-        let colors = TermViz::get_node_colors(agent);
+        let colors = TermViz::get_node_colors(agent)?;
 
         let mut lines = vec![];
         let mut layer_1_idx = 0;
@@ -566,7 +584,7 @@ impl TermViz {
         }
 
         let block = Block::default().padding(Padding::new(0, 0, 5, 0));
-        Paragraph::new(lines).block(block)
+        Ok(Paragraph::new(lines).block(block))
     }
 }
 

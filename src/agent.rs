@@ -1,46 +1,52 @@
 //! AI Agent
 //! An instance of the Game played by an AI
 
-use nn::Net;
+use color_eyre::Result;
+use itertools::Itertools;
 
-use crate::game::Game;
-use crate::*;
+use crate::{
+    config::{LOAD_FILE_NAME, NN_ARCH, STEP_COUNT},
+    game::Game,
+    neural_net::NeuralNet,
+    utils::{get_eight_dirs, Direction, Point},
+};
 
 #[derive(Clone)]
 pub struct Agent {
     pub game: Game,
-    pub brain: Net,
+    pub brain: NeuralNet,
 }
 
 impl Agent {
-    pub fn new(is_load: bool) -> Self {
+    pub fn new(is_load: bool) -> Result<Self> {
         let brain = if is_load {
-            let mut net = Net::load();
+            let mut net = NeuralNet::load(LOAD_FILE_NAME)?;
             net.mutate();
             net
         } else {
-            Net::new(&NN_ARCH)
+            NeuralNet::new(&NN_ARCH)?
         };
 
+        Ok(Self {
+            game: Game::new(),
+            brain,
+        })
+    }
+
+    pub fn with_brain(brain: NeuralNet) -> Self {
         Self {
             game: Game::new(),
             brain,
         }
     }
 
-    pub fn with_brain(brain: Net) -> Self {
-        Self {
-            game: Game::new(),
-            brain,
-        }
-    }
-
-    pub fn update(&mut self) -> bool {
+    pub fn update(&mut self) -> Result<bool> {
         if self.game.is_dead {
-            return false;
+            return Ok(false);
         }
 
-        self.game.update(self.get_brain_output());
+        let direction = self.get_brain_output()?;
+        self.game.update(direction);
 
         // Limit the number of steps the snake can take without eating
         let step_limit = self.get_step_limit();
@@ -48,7 +54,7 @@ impl Agent {
             self.game.is_dead = true;
         }
 
-        true
+        Ok(true)
     }
 
     pub fn fitness(&self) -> f32 {
@@ -70,41 +76,47 @@ impl Agent {
         fitness
     }
 
-    pub fn get_brain_output(&self) -> FourDirs {
+    pub fn get_brain_output(&self) -> Result<Direction> {
         let vision = self.get_brain_input();
-        let cur_dir = self.game.dir;
-        let nn_out = self.brain.predict(vision).last().unwrap().clone();
-        let max_index = nn_out
+        let cur_dir = self.game.direction;
+        let nn_out = self.brain.predict(vision)?.last().unwrap().clone();
+        let mut max_index = nn_out
             .iter()
             .enumerate()
-            .max_by(|(_, &a), (_, &b)| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap();
-        let dir = match max_index {
-            0 => FourDirs::Left,
-            1 => FourDirs::Right,
-            2 => FourDirs::Bottom,
-            _ => FourDirs::Top,
+            .sorted_by(|(_, &a), (_, &b)| a.partial_cmp(&b).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(i, _)| i);
+        let dir = match max_index.next() {
+            Some(0) => Direction::Left,
+            Some(1) => Direction::Right,
+            Some(2) => Direction::Bottom,
+            _ => Direction::Top,
         };
 
-        // Prevent the snake from turning back on itself
-        if (cur_dir.is_horizontal() && dir.is_horizontal())
-            || (cur_dir.is_vertical() && dir.is_vertical())
-        {
-            if cur_dir != dir {
-                cur_dir
-            } else {
-                dir
+        let direction = if matches!(
+            (cur_dir, dir),
+            (Direction::Left, Direction::Right)
+                | (Direction::Right, Direction::Left)
+                | (Direction::Top, Direction::Bottom)
+                | (Direction::Bottom, Direction::Top)
+        ) {
+            // Prevent the snake from turning back on itself by choosing the second highest output
+            match max_index.next() {
+                Some(0) => Direction::Left,
+                Some(1) => Direction::Right,
+                Some(2) => Direction::Bottom,
+                _ => Direction::Top,
             }
         } else {
             dir
-        }
+        };
+
+        Ok(direction)
     }
 
     pub fn get_brain_input(&self) -> Vec<f64> {
         let dirs = get_eight_dirs().to_vec();
         let vision = self.get_snake_vision(dirs);
-        let head_dir = self.game.dir.get_one_hot_dir();
+        let head_dir = self.game.direction.get_one_hot_dir();
         let tail_dir = self.get_tail_direction().get_one_hot_dir();
 
         vision.into_iter().chain(head_dir).chain(tail_dir).collect()
@@ -150,29 +162,29 @@ impl Agent {
 
     pub fn get_step_limit(&self) -> usize {
         match self.game.score() {
-            score if score > 30 => NUM_STEPS * 6,
-            score if score > 20 => NUM_STEPS * 3,
-            score if score > 5 => NUM_STEPS * 2,
-            _ => NUM_STEPS,
+            score if score > 30 => STEP_COUNT * 6,
+            score if score > 20 => STEP_COUNT * 3,
+            score if score > 5 => STEP_COUNT * 2,
+            _ => STEP_COUNT,
         }
     }
 
-    fn get_tail_direction(&self) -> FourDirs {
+    fn get_tail_direction(&self) -> Direction {
         if let Some(tail) = self.game.body.last() {
             if let Some(body) = self.game.body.get(self.game.body.len() - 2) {
                 let x = body.x - tail.x;
                 let y = body.y - tail.y;
 
                 return match (x, y) {
-                    (-1, 0) => FourDirs::Left,
-                    (1, 0) => FourDirs::Right,
-                    (0, 1) => FourDirs::Bottom,
-                    _ => FourDirs::Top,
+                    (-1, 0) => Direction::Left,
+                    (1, 0) => Direction::Right,
+                    (0, 1) => Direction::Bottom,
+                    _ => Direction::Top,
                 };
             }
         }
 
-        self.game.dir
+        self.game.direction
     }
 }
 

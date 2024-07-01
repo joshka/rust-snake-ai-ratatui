@@ -2,8 +2,8 @@
 pub const GRID_SIZE: i32 = 15;
 
 // Sim
-pub const NUM_AGENTS: usize = 500;
-pub const NUM_STEPS: usize = 50;
+pub const AGENT_COUNT: usize = 500;
+pub const STEP_COUNT: usize = 50;
 
 // Pop
 pub const POP_RETAINED: f32 = 0.1;
@@ -14,9 +14,9 @@ pub const POP_NUM_RANDOM: f32 = 0.1;
 
 // Data
 pub const SAVE_FILE_NAME: &str = "data/net.json";
-pub const LOAD_FILE_NAME: &str = "data/net.json";
-pub const IS_LOAD_SAVED_DATA: bool = true;
-pub const IS_SAVE_BEST_NET: bool = true;
+pub const LOAD_FILE_NAME: &str = "data/net-100.json";
+pub const LOAD_NET: bool = true;
+pub const SAVE_BEST_NET: bool = true;
 
 // NN
 pub const BRAIN_MUTATION_RATE: f64 = 0.1;

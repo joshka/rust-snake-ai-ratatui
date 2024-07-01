@@ -1,14 +1,17 @@
 //! Snake Game
 //! Handles all game related logic
 
-use crate::*;
+use crate::{
+    config::GRID_SIZE,
+    utils::{Direction, Point},
+};
 
 #[derive(Clone)]
 pub struct Game {
     pub head: Point,
     pub body: Vec<Point>,
     pub food: Point,
-    pub dir: FourDirs,
+    pub direction: Direction,
 
     pub is_dead: bool,
     pub total_steps: usize,
@@ -26,20 +29,20 @@ impl Game {
             body,
             head,
             food: Point::rand(),
-            dir: FourDirs::get_rand_dir(),
+            direction: Direction::get_rand_dir(),
             is_dead: false,
             total_steps: 0,
             no_food_steps: 0,
         }
     }
 
-    pub fn update(&mut self, dir: FourDirs) {
+    pub fn update(&mut self, direction: Direction) {
         if self.is_dead {
             return;
         }
 
         self.total_steps += 1;
-        self.dir = dir;
+        self.direction = direction;
         self.handle_food_collision();
         self.update_snake_positions();
 
@@ -62,8 +65,8 @@ impl Game {
     }
 
     fn update_snake_positions(&mut self) {
-        self.head.x += self.dir.value().0;
-        self.head.y += self.dir.value().1;
+        self.head.x += self.direction.value().0;
+        self.head.y += self.direction.value().1;
 
         for i in (1..self.body.len()).rev() {
             self.body[i] = self.body[i - 1];

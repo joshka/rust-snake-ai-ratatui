@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::*;
+use crate::config::GRID_SIZE;
 
 #[derive(Default, PartialEq, Eq, Hash, Clone, Copy, Debug)]
 pub struct Point {
@@ -9,7 +9,7 @@ pub struct Point {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq)]
-pub enum FourDirs {
+pub enum Direction {
     #[default]
     Left,
     Right,
@@ -19,10 +19,10 @@ pub enum FourDirs {
 
 pub fn get_eight_dirs() -> [(i32, i32); 8] {
     [
-        FourDirs::Left.value(),
-        FourDirs::Right.value(),
-        FourDirs::Bottom.value(),
-        FourDirs::Top.value(),
+        Direction::Left.value(),
+        Direction::Right.value(),
+        Direction::Bottom.value(),
+        Direction::Top.value(),
         (-1, 1),
         (1, 1),
         (1, -1),
@@ -30,7 +30,7 @@ pub fn get_eight_dirs() -> [(i32, i32); 8] {
     ]
 }
 
-impl FourDirs {
+impl Direction {
     pub fn get_rand_dir() -> Self {
         let mut rng = rand::thread_rng();
         match rng.gen_range(0..4) {
@@ -50,20 +50,12 @@ impl FourDirs {
         }
     }
 
-    pub fn is_horizontal(&self) -> bool {
-        matches!(self, FourDirs::Left | FourDirs::Right)
-    }
-
-    pub fn is_vertical(&self) -> bool {
-        matches!(self, FourDirs::Top | FourDirs::Bottom)
-    }
-
     pub fn get_one_hot_dir(&self) -> Vec<f64> {
         match self {
-            FourDirs::Left => vec![1.0, 0.0, 0.0, 0.0],
-            FourDirs::Right => vec![0.0, 1.0, 0.0, 0.0],
-            FourDirs::Bottom => vec![0.0, 0.0, 1.0, 0.0],
-            FourDirs::Top => vec![0.0, 0.0, 0.0, 1.0],
+            Direction::Left => vec![1.0, 0.0, 0.0, 0.0],
+            Direction::Right => vec![0.0, 1.0, 0.0, 0.0],
+            Direction::Bottom => vec![0.0, 0.0, 1.0, 0.0],
+            Direction::Top => vec![0.0, 0.0, 0.0, 1.0],
         }
     }
 }

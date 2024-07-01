@@ -1,13 +1,22 @@
-use std::io;
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode};
+use color_eyre::Result;
+use ratatui::crossterm::event::{self, Event, KeyCode};
 
-use sim::Simulation;
-use snake_tui::*;
+use crate::simulation::Simulation;
 
-fn main() -> io::Result<()> {
-    let mut sim = Simulation::new()?;
+mod agent;
+mod config;
+mod game;
+mod neural_net;
+mod population;
+mod simulation;
+mod utils;
+mod viz;
+
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let mut simulation = Simulation::start()?;
     loop {
         if event::poll(Duration::from_nanos(1))? {
             if let Event::Key(key) = event::read()? {
@@ -16,9 +25,8 @@ fn main() -> io::Result<()> {
                 }
             }
         }
-
-        sim.update();
+        simulation.update()?;
     }
-
-    sim.terminate()
+    simulation.stop()?;
+    Ok(())
 }
