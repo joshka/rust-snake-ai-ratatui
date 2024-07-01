@@ -11,9 +11,8 @@ fn main() -> io::Result<()> {
     loop {
         if event::poll(Duration::from_nanos(1))? {
             if let Event::Key(key) = event::read()? {
-                match key.code {
-                    KeyCode::Esc => break,
-                    _ => {}
+                if let KeyCode::Esc | KeyCode::Char('q') = key.code {
+                    break;
                 }
             }
         }
