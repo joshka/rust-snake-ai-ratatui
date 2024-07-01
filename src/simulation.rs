@@ -51,8 +51,12 @@ impl Simulation {
         }
 
         self.viz.update()?;
-        self.viz.draw();
+        // self.viz.draw();
         Ok(())
+    }
+
+    pub fn draw(&mut self) {
+        self.viz.draw();
     }
 
     pub fn start_generation(&mut self) -> Result<()> {
