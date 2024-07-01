@@ -51,19 +51,11 @@ impl FourDirs {
     }
 
     pub fn is_horizontal(&self) -> bool {
-        match self {
-            FourDirs::Left => true,
-            FourDirs::Right => true,
-            _ => false,
-        }
+        matches!(self, FourDirs::Left | FourDirs::Right)
     }
 
     pub fn is_vertical(&self) -> bool {
-        match self {
-            FourDirs::Top => true,
-            FourDirs::Bottom => true,
-            _ => false,
-        }
+        matches!(self, FourDirs::Top | FourDirs::Bottom)
     }
 
     pub fn get_one_hot_dir(&self) -> Vec<f64> {
@@ -82,7 +74,7 @@ impl Point {
     }
 
     pub fn equals(&self, other: Self) -> bool {
-        return self.x == other.x && self.y == other.y;
+        self.x == other.x && self.y == other.y
     }
 
     pub fn rand() -> Self {
@@ -95,12 +87,9 @@ impl Point {
 }
 
 // Tuple to point
-impl Into<Point> for (i32, i32) {
-    fn into(self) -> Point {
-        Point {
-            x: self.0,
-            y: self.1,
-        }
+impl From<(i32, i32)> for Point {
+    fn from(val: (i32, i32)) -> Self {
+        Point { x: val.0, y: val.1 }
     }
 }
 

@@ -39,7 +39,7 @@ impl Net {
             "Empty layers not allowed"
         );
 
-        let mut layers = Vec::new();
+        let mut layers = vec![];
         let first_layer_size = *layer_sizes.first().unwrap();
         let mut prev_layer_size = first_layer_size;
 
@@ -57,7 +57,7 @@ impl Net {
     pub fn merge(&self, other: &Net) -> Self {
         assert_eq!(self.layers.len(), other.layers.len());
 
-        let mut merged_layers = Vec::new();
+        let mut merged_layers = vec![];
         for i in 0..self.layers.len() {
             let merged_layer = self.layers[i].merge(&other.layers[i]);
             merged_layers.push(merged_layer);
@@ -78,7 +78,7 @@ impl Net {
             );
         }
 
-        let mut outputs = Vec::new();
+        let mut outputs = vec![];
         outputs.push(inputs);
         for (layer_index, layer) in self.layers.iter().enumerate() {
             let layer_results = layer.predict(&outputs[layer_index]);
@@ -124,7 +124,7 @@ impl Net {
 
     // This is for visualization
     pub fn get_bias(&self, layer_idx: usize) -> Vec<f64> {
-        let mut res = Vec::new();
+        let mut res = vec![];
         for node in self.layers[layer_idx].nodes.iter() {
             res.push(node.bias);
         }
@@ -136,10 +136,10 @@ impl Net {
 impl Layer {
     fn new(layer_size: usize, prev_layer_size: usize) -> Self {
         let mut rng = rand::thread_rng();
-        let mut nodes: Vec<Node> = Vec::new();
+        let mut nodes: Vec<Node> = vec![];
 
         for _ in 0..layer_size {
-            let mut weights: Vec<f64> = Vec::new();
+            let mut weights: Vec<f64> = vec![];
             for _ in 0..prev_layer_size {
                 let random_weight: f64 = rng.gen_range(-1.0..1.0);
                 weights.push(random_weight);
@@ -154,10 +154,10 @@ impl Layer {
     fn merge(&self, other: &Layer) -> Self {
         assert_eq!(self.nodes.len(), other.nodes.len());
         let mut rng = rand::thread_rng();
-        let mut nodes: Vec<Node> = Vec::new();
+        let mut nodes: Vec<Node> = vec![];
 
         for (node1, node2) in self.nodes.iter().zip(other.nodes.iter()) {
-            let mut merged_weights = Vec::new();
+            let mut merged_weights = vec![];
             for (&weight1, &weight2) in node1.weights.iter().zip(node2.weights.iter()) {
                 let selected_weight = if rng.gen::<bool>() { weight1 } else { weight2 };
                 merged_weights.push(selected_weight);
@@ -176,8 +176,8 @@ impl Layer {
         Self { nodes }
     }
 
-    fn predict(&self, inputs: &Vec<f64>) -> Vec<f64> {
-        let mut layer_results = Vec::new();
+    fn predict(&self, inputs: &[f64]) -> Vec<f64> {
+        let mut layer_results = vec![];
         for node in self.nodes.iter() {
             let mut weighted_sum = node.bias;
             for (weight, value) in node.weights.iter().zip(inputs.iter()) {

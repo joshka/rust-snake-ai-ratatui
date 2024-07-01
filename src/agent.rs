@@ -59,7 +59,7 @@ impl Agent {
 
         let mut fitness = 1.0;
         if score < 5.0 {
-            fitness *= (2.0 as f32).powf(score);
+            fitness *= 2.0_f32.powf(score);
             fitness *= score;
             fitness *= self.game.total_steps as f32 * 0.1;
         } else {
@@ -107,15 +107,11 @@ impl Agent {
         let head_dir = self.game.dir.get_one_hot_dir();
         let tail_dir = self.get_tail_direction().get_one_hot_dir();
 
-        vision
-            .into_iter()
-            .chain(head_dir.into_iter())
-            .chain(tail_dir.into_iter())
-            .collect()
+        vision.into_iter().chain(head_dir).chain(tail_dir).collect()
     }
 
     fn get_snake_vision(&self, dirs: Vec<(i32, i32)>) -> Vec<f64> {
-        let mut vision = Vec::new();
+        let mut vision = vec![];
 
         for d in dirs {
             // Food and Body are one hot

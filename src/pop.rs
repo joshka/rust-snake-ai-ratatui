@@ -17,7 +17,7 @@ pub struct Population {
 
 impl Population {
     pub fn new() -> Self {
-        let mut agents = Vec::new();
+        let mut agents = vec![];
         for _ in 0..NUM_AGENTS {
             agents.push(Agent::new(IS_LOAD_SAVED_DATA));
         }
@@ -62,7 +62,7 @@ impl Population {
             return (net, max_score);
         }
 
-        return (Net::new(&NN_ARCH), max_score);
+        (Net::new(&NN_ARCH), max_score)
     }
 
     fn reset_pop(&mut self) {
@@ -82,8 +82,8 @@ impl Population {
         // Elitism
         // Preserve best performing agents
         // Hels maintain high fitness levels within the population
-        for i in 0..num_elite as usize {
-            let old_brain = agents_sorted[i].brain.clone();
+        for agent in agents_sorted.iter().take(num_elite) {
+            let old_brain = agent.brain.clone();
             let new_agent = Agent::with_brain(old_brain);
             new_agents.push(new_agent);
         }
@@ -120,8 +120,8 @@ impl Population {
 
         // Mutational Elitism
         // Allows for incremental improvements to already good solutions
-        for i in 0..num_mutated as usize {
-            let mut old_brain = agents_sorted[i].brain.clone();
+        for agent in agents_sorted.iter().take(num_mutated) {
+            let mut old_brain = agent.brain.clone();
             old_brain.mutate();
             new_agents.push(Agent::with_brain(old_brain));
         }
@@ -151,7 +151,7 @@ impl Population {
 
     fn generate_gene_pool(&self) -> Option<WeightedIndex<f32>> {
         let mut max_fitness = 0.0;
-        let mut weights = Vec::new();
+        let mut weights = vec![];
 
         for a in self.agents.iter() {
             let fitness = a.fitness();
@@ -168,5 +168,11 @@ impl Population {
             .for_each(|i| *i = (*i / max_fitness) * 100.0);
 
         WeightedIndex::new(&weights).ok()
+    }
+}
+
+impl Default for Population {
+    fn default() -> Self {
+        Self::new()
     }
 }

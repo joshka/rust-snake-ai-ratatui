@@ -18,7 +18,7 @@ pub struct Game {
 impl Game {
     pub fn new() -> Self {
         let head = Point::new(GRID_SIZE / 2, GRID_SIZE / 2);
-        let mut body = vec![head.clone()];
+        let mut body = vec![head];
         body.push(Point::new(head.x - 1, head.y));
         body.push(Point::new(head.x - 2, head.y));
 
@@ -80,5 +80,11 @@ impl Game {
         self.no_food_steps = 0;
         self.body.push(Point::new(self.head.x, self.head.y));
         self.food = Point::rand();
+    }
+}
+
+impl Default for Game {
+    fn default() -> Self {
+        Self::new()
     }
 }
