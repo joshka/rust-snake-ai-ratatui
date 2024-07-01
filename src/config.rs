@@ -14,7 +14,7 @@ pub const POP_NUM_RANDOM: f32 = 0.1;
 
 // Data
 pub const SAVE_FILE_NAME: &str = "data/net.json";
-pub const LOAD_FILE_NAME: &str = "data/net-100.json";
+pub const LOAD_FILE_NAME: &str = "data/net.json";
 pub const LOAD_NET: bool = true;
 pub const SAVE_BEST_NET: bool = true;
 

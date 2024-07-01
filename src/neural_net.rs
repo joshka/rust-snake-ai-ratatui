@@ -15,7 +15,7 @@ use color_eyre::{
     Result,
 };
 use itertools::Itertools;
-use rand::Rng;
+use rand::{rngs::ThreadRng, Rng};
 use serde::{Deserialize, Serialize};
 
 use crate::config::{BRAIN_MUTATION_RATE, BRAIN_MUTATION_VARIATION};
@@ -98,17 +98,15 @@ impl NeuralNet {
     }
 
     /// Predict the output of the neural network given an input
-    pub fn predict(&self, inputs: Vec<f64>) -> Result<Vec<Vec<f64>>> {
+    pub fn predict(&self, inputs: Vec<f64>) -> Result<Vec<f64>> {
         ensure!(
             inputs.len() == self.input_count,
             "Bad input size, expected {:?} but got {:?}",
             self.input_count,
             inputs.len()
         );
-        let outputs = self.layers.iter().fold(vec![inputs], |mut outputs, layer| {
-            let layer_results = layer.predict(outputs.last().unwrap());
-            outputs.push(layer_results);
-            outputs
+        let outputs = self.layers.iter().fold(inputs, |outputs, layer| {
+            layer.predict(&outputs).collect_vec()
         });
         Ok(outputs)
     }
@@ -154,29 +152,13 @@ impl Layer {
         );
         let mut rng = rand::thread_rng();
         let nodes = zip(self.nodes.iter(), other.nodes.iter())
-            .map(|(node1, node2)| Node {
-                weights: zip(node1.weights.iter(), node2.weights.iter())
-                    .map(|(&w1, &w2)| if rng.gen() { w1 } else { w2 })
-                    .collect_vec(),
-                bias: if rng.gen() { node1.bias } else { node2.bias },
-            })
+            .map(|(node1, node2)| node1.merge(node2, &mut rng))
             .collect_vec();
-
         Ok(Self { nodes })
     }
 
-    fn predict(&self, inputs: &[f64]) -> Vec<f64> {
-        self.nodes
-            .iter()
-            .map(|node| {
-                let weighted_sum = node.bias
-                    + zip(node.weights.iter(), inputs)
-                        .map(|(weight, value)| weight * value)
-                        .sum::<f64>();
-                // ReLU activation
-                weighted_sum.max(0.0)
-            })
-            .collect_vec()
+    fn predict<'a>(&'a self, inputs: &'a [f64]) -> impl Iterator<Item = f64> + '_ {
+        self.nodes.iter().map(|node| node.predict(inputs))
     }
 
     fn mutate(&mut self) {
@@ -194,5 +176,24 @@ impl Layer {
                 node.bias += rng.gen_range(-BRAIN_MUTATION_VARIATION..BRAIN_MUTATION_VARIATION);
             }
         }
+    }
+}
+
+impl Node {
+    fn merge(&self, other: &Node, rng: &mut ThreadRng) -> Self {
+        let weights = zip(self.weights.iter(), other.weights.iter())
+            .map(|(&w1, &w2)| if rng.gen() { w1 } else { w2 })
+            .collect_vec();
+        let bias = if rng.gen() { self.bias } else { other.bias };
+        Self { weights, bias }
+    }
+
+    fn predict(&self, inputs: &[f64]) -> f64 {
+        let weighted_sum = self.bias
+            + zip(self.weights.iter(), inputs)
+                .map(|(weight, value)| weight * value)
+                .sum::<f64>();
+        // ReLU activation
+        weighted_sum.max(0.0)
     }
 }

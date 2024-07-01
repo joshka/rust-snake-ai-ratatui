@@ -79,7 +79,7 @@ impl Agent {
     pub fn get_brain_output(&self) -> Result<Direction> {
         let vision = self.get_brain_input();
         let cur_dir = self.game.direction;
-        let nn_out = self.brain.predict(vision)?.last().unwrap().clone();
+        let nn_out = self.brain.predict(vision)?.clone();
         let mut max_index = nn_out
             .iter()
             .enumerate()
