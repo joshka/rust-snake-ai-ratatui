@@ -4,7 +4,6 @@ pub const GRID_SIZE: i32 = 15;
 // Sim
 pub const NUM_AGENTS: usize = 500;
 pub const NUM_STEPS: usize = 50;
-pub const NUM_THREADS: usize = 8;
 
 // Pop
 pub const POP_RETAINED: f32 = 0.1;
