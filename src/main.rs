@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use color_eyre::Result;
 use ratatui::crossterm::event::{self, Event, KeyCode};
@@ -17,8 +17,10 @@ mod viz;
 fn main() -> Result<()> {
     color_eyre::install()?;
     let mut simulation = Simulation::start()?;
+    let mut last_poll = Instant::now();
     loop {
-        if event::poll(Duration::from_nanos(1))? {
+        if last_poll.elapsed() > Duration::from_millis(15) && event::poll(Duration::ZERO)? {
+            last_poll = Instant::now();
             if let Event::Key(key) = event::read()? {
                 if let KeyCode::Esc | KeyCode::Char('q') = key.code {
                     break;
